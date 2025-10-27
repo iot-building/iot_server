@@ -3,40 +3,26 @@ package controller;
 import java.util.List;
 import java.util.Scanner;
 
-import org.eclipse.paho.client.mqttv3.MqttClient;
-import org.eclipse.paho.client.mqttv3.MqttConnectOptions;
-import org.eclipse.paho.client.mqttv3.MqttException;
-import org.eclipse.paho.client.mqttv3.MqttMessage;
-
 import dao.AdminParkingDAOImpl;
 import dao.UserDAOImpl;
 import dto.MemberDTO;
 import dto.ParkingDashboardDTO;
 import dto.ParkingSpaceDTO;
 import dto.ParkingSummaryDTO;
-import mqtt.MqttSubClientParking;  // ✅ 추가
+import mqtt.MqttManager;
+import mqtt.MqttSubClientParking;
 
 public class ParkedController {
 
     private final AdminParkingDAOImpl dao = new AdminParkingDAOImpl();
-    private MqttClient mqttClient;
+    private MqttManager mqttManager; // ✅ 통합 매니저 사용
 
     public ParkedController() {
-        connectMqtt();
-    }
-
-    private void connectMqtt() {
-        try {
-            if (mqttClient == null || !mqttClient.isConnected()) {
-                mqttClient = new MqttClient("tcp://192.168.14.56:1883", MqttClient.generateClientId());
-                MqttConnectOptions options = new MqttConnectOptions();
-                options.setCleanSession(true);
-                mqttClient.connect(options);
-                
-            }
-        } catch (MqttException e) {
-            System.out.println("⚠️ MQTT 연결 실패: " + e.getMessage());
-        }
+        // MQTT 초기화
+        mqttManager = new MqttManager();
+        Thread mqttThread = new Thread(mqttManager);
+        mqttThread.setDaemon(true);
+        mqttThread.start();
     }
 
     public void adminParked(MemberDTO currentUser) {
@@ -79,31 +65,23 @@ public class ParkedController {
 
                 case "4" -> {
                     try {
-                        if (mqttClient == null || !mqttClient.isConnected()) connectMqtt();
+                        System.out.println("🛰 주차 센서 통신 스레드 시작...");
 
+                        // ✅ 통합된 SubClientParking 실행
                         Thread subThread = new Thread(() -> {
-                            try {
-                                System.out.println("🛰 차량 감지 스레드 실행 중...");
-                                MqttSubClientParking sub = new MqttSubClientParking();
-                                sub.start();
-                            } catch (Exception e) {
-                                System.out.println("⚠️ 구독 스레드 오류: " + e.getMessage());
-                            }
+                            MqttSubClientParking sub = new MqttSubClientParking();
+                            sub.start();
                         });
-                        subThread.setDaemon(true); // 백그라운드 스레드로 설정 (메인 블로킹 방지)
+                        subThread.setDaemon(true);
                         subThread.start();
 
-                        // ✅ 라즈베리파이에 센서 활성화 명령 전송
+                        // ✅ 파이썬 라즈베리파이에 activate 명령 발행
                         String topic = "1/parking/01/cmd";
                         String msg = "{\"action\":\"activate\"}";
-                        MqttMessage mqttMessage = new MqttMessage(msg.getBytes());
-                        mqttMessage.setQos(0);
-                        mqttClient.publish(topic, mqttMessage);
+                        mqttManager.publish(topic, msg);
 
                         System.out.println("📤 MQTT Publish → " + topic + " : " + msg);
                         System.out.println("✅ 주차장 센서 활성화 명령 전송 완료!");
-                        System.out.println("💡 차량 감지 스레드가 백그라운드에서 대기 중입니다.");
-                        
                     } catch (Exception e) {
                         System.out.println("❌ MQTT 전송 실패: " + e.getMessage());
                     }
@@ -120,75 +98,68 @@ public class ParkedController {
         sc.close();
     }
 
+    public void userhandleAccess(MemberDTO currentUser) {
+        final UserDAOImpl dao2 = new UserDAOImpl();
+        Scanner sc = new Scanner(System.in);
+        boolean running = true;
 
+        while (running) {
+            System.out.println("\n===== 사용자 관리 메뉴 =====");
+            System.out.println("1. 사용자 정보 조회");
+            System.out.println("2. 차량 등록");
+            System.out.println("3. 상위 메뉴로 이동");
+            System.out.print("메뉴 선택: ");
+            String choice = sc.nextLine();
 
-	public void userhandleAccess(MemberDTO currentUser) {
-		final UserDAOImpl dao2 = new UserDAOImpl();
-		Scanner sc = new Scanner(System.in);
+            switch (choice) {
+                case "1" -> {
+                    System.out.print("조회할 사용자 ID 입력: ");
+                    String inputId = sc.nextLine();
+                    MemberDTO dto = dao2.getUserInfo(inputId);
 
-		boolean running = true;
-		while (running) {
-			System.out.println("\n===== 사용자 관리 메뉴 =====");
-			System.out.println("1. 사용자 정보 조회");
-			System.out.println("2. 차량 등록");
-			System.out.println("3. 상위 메뉴로 이동");
-			System.out.print("메뉴 선택: ");
-			String choice = sc.nextLine();
+                    if (dto != null) {
+                        System.out.println("조회 성공 ✅");
+                        System.out.println("-----------------------------------");
+                        System.out.println("회원번호: " + dto.getUserId());
+                        System.out.println("아이디: " + dto.getId());
+                        System.out.println("이름: " + dto.getName());
+                        System.out.println("카드ID: " + dto.getCardId());
+                        System.out.println("차량번호: " + dto.getVehicle_no());
+                        System.out.println("권한레벨: " + dto.getAccess_level());
+                        System.out.println("활성상태: " + ((dto.getActive() != null && dto.getActive()) ? "활성" : "비활성"));
+                        System.out.println("가입일: " + dto.getCreated_at());
+                        System.out.println("-----------------------------------");
+                    } else {
+                        System.out.println("❌ 해당 아이디의 사용자를 찾을 수 없습니다.");
+                    }
 
-			switch (choice) {
-			case "1":
+                    System.out.println("엔터를 누르면 다시 메뉴로 돌아갑니다.");
+                    sc.nextLine();
+                }
 
-				System.out.print("조회할 사용자 ID 입력: ");
-				String inputId = sc.nextLine();
+                case "2" -> {
+                    System.out.print("사용자 ID를 입력하세요: ");
+                    String id = sc.nextLine();
+                    System.out.print("등록할 차량 번호를 입력하세요 (예: 123가4567): ");
+                    String vehicleNo = sc.nextLine();
 
-				MemberDTO dto = dao2.getUserInfo(inputId);
+                    boolean result = dao2.updateVehicle(id, vehicleNo);
 
-				if (dto != null) {
-					System.out.println("조회 성공 ✅");
-					System.out.println("-----------------------------------");
-					System.out.println("회원번호: " + dto.getUserId());
-					System.out.println("아이디: " + dto.getId());
-					System.out.println("이름: " + dto.getName());
-					System.out.println("카드ID: " + dto.getCardId());
-					System.out.println("차량번호: " + dto.getVehicle_no());
-					System.out.println("권한레벨: " + dto.getAccess_level());
-					System.out.println("활성상태: " + ((dto.getActive() != null && dto.getActive()) ? "활성" : "비활성"));
-					System.out.println("가입일: " + dto.getCreated_at());
-					System.out.println("-----------------------------------");
-				} else {
-					System.out.println("❌ 해당 아이디의 사용자를 찾을 수 없습니다.");
+                    if (result) {
+                        System.out.println("✅ 차량 등록이 완료되었습니다!");
+                    } else {
+                        System.out.println("⚠️ 차량 등록 실패 또는 이미 등록된 차량이 있습니다.");
+                    }
 
-				}
-				System.out.println("엔터를 누르면 다시 메뉴로 돌아갑니다.");
-				sc.nextLine();
-				break;
+                    System.out.println("엔터를 누르면 다시 메뉴로 돌아갑니다.");
+                    sc.nextLine();
+                }
 
-			case "2":
-				// 차량 등록
-				System.out.print("사용자 ID를 입력하세요: ");
-				String id = sc.nextLine();
-				System.out.print("등록할 차량 번호를 입력하세요 (예: 123가4567): ");
-				String vehicleNo = sc.nextLine();
+                case "3" -> running = false;
 
-				boolean result = dao2.updateVehicle(id, vehicleNo);
-
-				if (result) {
-					System.out.println("✅ 차량 등록이 완료되었습니다!");
-				} else {
-					System.out.println("⚠️ 차량 등록 실패 또는 이미 등록된 차량이 있습니다.");
-				}
-				System.out.println("엔터를 누르면 다시 메뉴로 돌아갑니다.");
-				sc.nextLine();
-				break;
-
-			case "3":
-				return;
-
-			default:
-				System.out.println("잘못된 입력입니다. 다시 선택해주세요.");
-				break;
-			}
-		}
-		sc.close();
-	}
+                default -> System.out.println("잘못된 입력입니다. 다시 선택해주세요.");
+            }
+        }
+        sc.close();
+    }
 }
