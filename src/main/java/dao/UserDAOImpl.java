@@ -1,12 +1,12 @@
 package dao;
 
-import util.DBUtil;
-import dto.MemberDTO;
-
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+
+import dto.MemberDTO;
+import util.DBUtil;
 
 public class UserDAOImpl implements UserDAO{
     @Override

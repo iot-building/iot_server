@@ -1,8 +1,13 @@
 package dao;
 
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Statement;
+
 import dto.AccessLogDTO;
 import util.DBUtil;
-import java.sql.*;
 
 public class AccessDAOImpl implements AccessDAO {
 

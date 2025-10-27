@@ -7,10 +7,10 @@ import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
 
-import util.DBUtil;
 import dto.ParkingDashboardDTO;
 import dto.ParkingSpaceDTO;
 import dto.ParkingSummaryDTO;
+import util.DBUtil;
 
 public class AdminParkingDAOImpl implements AdminParkingDao {
 
@@ -124,7 +124,7 @@ public class AdminParkingDAOImpl implements AdminParkingDao {
 
 		} catch (SQLException e) {
 			e.printStackTrace();
-		}
+		}	
 
 		return list;
 	}

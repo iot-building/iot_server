@@ -5,13 +5,13 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Scanner;
 
-import util.TimeUtil;
 import dao.OfficeDAO;
 import dto.EnvironmentDTO;
 import dto.FireEventDTO;
 import dto.MemberDTO;
 import service.FireService;
 import service.FireServiceImpl;
+import util.TimeUtil;
 
 public class FireController {
     private final FireService service = new FireServiceImpl();

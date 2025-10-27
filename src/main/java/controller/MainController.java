@@ -1,17 +1,12 @@
 package controller;
 
-import java.util.Arrays;
-import java.util.List;
 import java.util.Scanner;
 
 import dto.LoginUserDTO;
 import dto.MemberDTO;
 import mqtt.MqttManager;
-import mqtt.devices.DHtHandler;
-import mqtt.devices.ELVHandler;
 import service.UserService;
 import service.UserServiceImpl;
-import controller.AccessController;
 import view.MainUI;
 
 public class MainController {
